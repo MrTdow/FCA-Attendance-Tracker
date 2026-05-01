@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FCA Attendance Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Buckeye Trail Warriors FCA</p>
+      <h1>Attendance Tracker</h1>
+    </div>
+    <div class="header-actions">
+      <button id="backupBtn" class="ghost-btn" type="button">Export backup</button>
+      <label class="ghost-btn file-label">
+        Import backup
+        <input id="restoreInput" type="file" accept="application/json">
+      </label>
+      <button id="resetBtn" class="danger-btn" type="button">Reset</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="summary-grid" aria-label="FCA summary">
+      <article>
+        <span>Students</span>
+        <strong id="studentCount">0</strong>
+      </article>
+      <article>
+        <span>Meetings</span>
+        <strong id="meetingCount">0</strong>
+      </article>
+      <article>
+        <span>Latest Attendance</span>
+        <strong id="latestCount">0</strong>
+      </article>
+      <article>
+        <span>Average</span>
+        <strong id="averageCount">0</strong>
+      </article>
+    </section>
+
+    <nav class="view-tabs" aria-label="Tracker views">
+      <button class="tab active" data-view="take" type="button">Take Attendance</button>
+      <button class="tab" data-view="dashboard" type="button">Dashboard</button>
+      <button class="tab" data-view="leaderboard" type="button">Leaderboard</button>
+      <button class="tab" data-view="students" type="button">Students</button>
+      <button class="tab" data-view="meetings" type="button">Meetings</button>
+      <button class="tab" data-view="food" type="button">Food Sign-Up</button>
+      <button class="tab" data-view="reports" type="button">Reports</button>
+    </nav>
+
+    <section id="takeView" class="view active-view">
+      <div class="toolbar attendance-toolbar">
+        <div class="field">
+          <label for="meetingSelect">Meeting date</label>
+          <select id="meetingSelect"></select>
+        </div>
+        <div class="present-counter">
+          <span>Present</span>
+          <strong id="toolbarPresentCount">0</strong>
+        </div>
+        <button id="todayModeBtn" class="ghost-btn" type="button">Today Mode</button>
+        <button id="addTodayBtn" class="primary-btn" type="button">Add today</button>
+        <button id="markAllBtn" class="ghost-btn" type="button">Mark all present</button>
+        <button id="clearAllBtn" class="ghost-btn" type="button">Clear all</button>
+      </div>
+      <form id="quickAddStudentForm" class="quick-add-form">
+        <div class="field grow">
+          <label for="quickStudentNameInput">Add student</label>
+          <input id="quickStudentNameInput" type="text" autocomplete="off" placeholder="Student name">
+        </div>
+        <label class="checkbox-field">
+          <input id="quickStudentPresentInput" type="checkbox" checked>
+          Present today
+        </label>
+        <button class="primary-btn" type="submit">Add student</button>
+      </form>
+      <div class="search-row">
+        <input id="studentSearch" type="search" placeholder="Search student">
+        <span id="currentMeetingMeta"></span>
+      </div>
+      <div class="keyboard-hint" id="keyboardHint">Use arrow keys to move, Space to toggle, Enter for next.</div>
+      <div id="attendanceList" class="attendance-list"></div>
+    </section>
+
+    <section id="dashboardView" class="view">
+      <div class="leaderboard-hero">
+        <div>
+          <p class="eyebrow dark">Quick Insights</p>
+          <h2>FCA Dashboard</h2>
+        </div>
+        <span id="dashboardMeta"></span>
+      </div>
+      <div id="insightGrid" class="insight-grid"></div>
+    </section>
+
+    <section id="leaderboardView" class="view">
+      <div class="leaderboard-hero">
+        <div>
+          <p class="eyebrow dark">Warrior Streaks</p>
+          <h2>FCA Leaderboard</h2>
+        </div>
+        <span id="leaderboardMeta"></span>
+      </div>
+      <div class="badge-key" aria-label="Badge explanations">
+        <strong>Badge Key</strong>
+        <span><b>3-week streak</b> Present for 3 meetings in a row.</span>
+        <span><b>5-week streak</b> Present for 5 meetings in a row.</span>
+        <span><b>10-week streak</b> Present for 10 meetings in a row.</span>
+        <span><b>Perfect</b> No missed meetings.</span>
+        <span><b>Comeback</b> Returned after missing 3 or more meetings.</span>
+      </div>
+      <div id="podiumList" class="podium-list"></div>
+      <div id="leaderboardTable" class="data-table"></div>
+    </section>
+
+    <section id="studentsView" class="view">
+      <form id="addStudentForm" class="inline-form">
+        <div class="field">
+          <label for="studentNameInput">New student</label>
+          <input id="studentNameInput" type="text" autocomplete="off" placeholder="First Last">
+        </div>
+        <button class="primary-btn" type="submit">Add student</button>
+      </form>
+      <div id="studentTable" class="data-table"></div>
+    </section>
+
+    <section id="meetingsView" class="view">
+      <form id="addMeetingForm" class="inline-form">
+        <div class="field">
+          <label for="meetingDateInput">Meeting date</label>
+          <input id="meetingDateInput" type="date">
+        </div>
+        <div class="field grow">
+          <label for="meetingNoteInput">Note</label>
+          <input id="meetingNoteInput" type="text" placeholder="Optional, such as switched from Friday">
+        </div>
+        <button class="primary-btn" type="submit">Add meeting</button>
+      </form>
+      <div id="meetingTable" class="data-table"></div>
+    </section>
+
+    <section id="foodView" class="view">
+      <div class="leaderboard-hero">
+        <div>
+          <p class="eyebrow dark">2026-27 FCA</p>
+          <h2>Food Donation Sign-Up</h2>
+        </div>
+        <span id="foodSignupMeta"></span>
+      </div>
+
+      <form id="addFoodDateForm" class="inline-form spaced-form">
+        <div class="field">
+          <label for="foodDateInput">FCA date</label>
+          <input id="foodDateInput" type="date">
+        </div>
+        <div class="field grow">
+          <label for="foodDateNoteInput">Date note</label>
+          <input id="foodDateNoteInput" type="text" placeholder="Optional, such as switched from Friday">
+        </div>
+        <button class="ghost-btn" type="submit">Add date</button>
+      </form>
+
+      <form id="donationForm" class="donation-form">
+        <div class="field">
+          <label for="donationEventSelect">FCA date</label>
+          <select id="donationEventSelect"></select>
+        </div>
+        <div class="field">
+          <label for="donorNameInput">Name</label>
+          <input id="donorNameInput" type="text" autocomplete="off" placeholder="Donor name">
+        </div>
+        <div class="field">
+          <label for="foodItemInput">Food or drink</label>
+          <input id="foodItemInput" type="text" autocomplete="off" placeholder="Donuts, juice, fruit, etc.">
+        </div>
+        <div class="field small-field">
+          <label for="servingsInput">Serves</label>
+          <input id="servingsInput" type="number" min="1" step="1" placeholder="25">
+        </div>
+        <div class="field">
+          <label for="donorContactInput">Contact</label>
+          <input id="donorContactInput" type="text" autocomplete="off" placeholder="Optional">
+        </div>
+        <div class="field grow">
+          <label for="donationNotesInput">Notes</label>
+          <input id="donationNotesInput" type="text" placeholder="Optional">
+        </div>
+        <button class="primary-btn" type="submit">Add donation</button>
+      </form>
+
+      <div class="toolbar food-actions">
+        <button id="copyFoodCsvBtn" class="ghost-btn" type="button">Copy food CSV</button>
+        <button id="downloadFoodCsvBtn" class="ghost-btn" type="button">Download food CSV</button>
+      </div>
+      <div id="foodSignupList" class="food-signup-list"></div>
+    </section>
+
+    <section id="reportsView" class="view">
+      <div class="toolbar">
+        <button id="copyCsvBtn" class="primary-btn" type="button">Copy CSV</button>
+        <button id="downloadCsvBtn" class="ghost-btn" type="button">Download CSV</button>
+      </div>
+      <div class="report-grid">
+        <article>
+          <h2>Top Attendance</h2>
+          <ol id="topStudents"></ol>
+        </article>
+        <article>
+          <h2>Lowest Attendance</h2>
+          <ol id="lowStudents"></ol>
+        </article>
+      </div>
+      <article class="watchlist-panel">
+        <div class="watchlist-header">
+          <h2>Missing Meetings Watchlist</h2>
+          <span id="watchlistMeta"></span>
+        </div>
+        <div id="missingWatchlist" class="watchlist"></div>
+      </article>
+      <article class="watchlist-panel">
+        <div class="watchlist-header">
+          <h2>Student Attendance Stats</h2>
+          <span id="reportStatsMeta"></span>
+        </div>
+        <div id="reportStatsTable" class="data-table"></div>
+      </article>
+    </section>
+  </main>
+
+  <template id="studentRowTemplate">
+    <button class="student-toggle" type="button">
+      <span class="student-name"></span>
+      <span class="attendance-pill"></span>
+    </button>
+  </template>
+
+  <script src="app.js"></script>
+  <div id="saveToast" class="save-toast" aria-live="polite"></div>
+</body>
+</html>
