@@ -29,6 +29,81 @@ const schoolOffFoodDates = new Set([
   "2027-01-01", "2027-02-12", "2027-03-26", "2027-04-16"
 ]);
 
+const calendarAdjustmentSeeds = [
+  {
+    id: "adjustment-2026-09-18",
+    weekOf: "Sept. 14-18",
+    fridayUnavailable: "2026-09-18",
+    reason: "Fair Days - No School",
+    schoolDays: 1,
+    suggestedDate: "",
+    recommendedAction: "Skip"
+  },
+  {
+    id: "adjustment-2026-10-16",
+    weekOf: "Oct. 12-16",
+    fridayUnavailable: "2026-10-16",
+    reason: "Parent/Teacher Conferences",
+    schoolDays: 4,
+    suggestedDate: "2026-10-14",
+    recommendedAction: "Reschedule"
+  },
+  {
+    id: "adjustment-2026-11-27",
+    weekOf: "Nov. 23-27",
+    fridayUnavailable: "2026-11-27",
+    reason: "Thanksgiving Break",
+    schoolDays: 2,
+    suggestedDate: "",
+    recommendedAction: "Skip"
+  },
+  {
+    id: "adjustment-2026-12-25",
+    weekOf: "Dec. 21-25",
+    fridayUnavailable: "2026-12-25",
+    reason: "Christmas Break",
+    schoolDays: 2,
+    suggestedDate: "",
+    recommendedAction: "Skip"
+  },
+  {
+    id: "adjustment-2027-01-01",
+    weekOf: "Dec. 28-Jan. 1",
+    fridayUnavailable: "2027-01-01",
+    reason: "Christmas Break",
+    schoolDays: 0,
+    suggestedDate: "",
+    recommendedAction: "Skip"
+  },
+  {
+    id: "adjustment-2027-02-12",
+    weekOf: "Feb. 8-12",
+    fridayUnavailable: "2027-02-12",
+    reason: "Parent/Teacher Conferences",
+    schoolDays: 4,
+    suggestedDate: "2027-02-10",
+    recommendedAction: "Reschedule"
+  },
+  {
+    id: "adjustment-2027-03-26",
+    weekOf: "Mar. 22-26",
+    fridayUnavailable: "2027-03-26",
+    reason: "Easter Break",
+    schoolDays: 4,
+    suggestedDate: "2027-03-24",
+    recommendedAction: "Reschedule"
+  },
+  {
+    id: "adjustment-2027-04-16",
+    weekOf: "Apr. 12-16",
+    fridayUnavailable: "2027-04-16",
+    reason: "Spring Break",
+    schoolDays: 4,
+    suggestedDate: "2027-04-14",
+    recommendedAction: "Reschedule"
+  }
+];
+
 const spreadsheetSeedRows = [
   ["Addison S", "0100000FTTTTTTTTTTTTFFTFFFF"],
   ["Adrian A", "0000011FTTTTFTTTTFTTTTTTFFF"],
@@ -139,7 +214,8 @@ function bindElements() {
     "quickStudentPresentInput", "studentNameInput", "meetingDateInput", "meetingNoteInput",
     "dashboardMeta", "insightGrid", "leaderboardMeta", "podiumList", "leaderboardTable",
     "topStudents", "lowStudents", "watchlistMeta", "missingWatchlist", "reportStatsMeta",
-    "reportStatsTable", "foodSignupMeta", "foodDateInput", "foodDateNoteInput",
+    "reportStatsTable", "calendarAdjustmentsMeta", "calendarConflictCount", "calendarRescheduleCount",
+    "calendarSkipCount", "calendarAdjustmentsList", "foodSignupMeta", "foodDateInput", "foodDateNoteInput",
     "donationEventSelect", "donorNameInput", "foodItemInput", "servingsInput",
     "donorContactInput", "donationNotesInput", "foodSignupList", "saveToast"
   ].forEach(id => {
@@ -185,6 +261,7 @@ function createSeedState() {
     students,
     foodEvents: createSeedFoodEvents(),
     donations: [],
+    calendarAdjustments: createSeedCalendarAdjustments(),
     selectedMeetingId: meetings.at(-1)?.id || "",
     selectedStudentId: students[0]?.id || "",
     todayMode: false,
@@ -202,6 +279,7 @@ function normalizeState(raw) {
   const donations = Array.isArray(raw.donations)
     ? raw.donations.filter(donation => !removedFoodEventIds.has(donation.eventId))
     : [];
+  const calendarAdjustments = normalizeCalendarAdjustments(raw.calendarAdjustments);
   students.forEach(student => {
     if (!student.attendance || typeof student.attendance !== "object") student.attendance = {};
     meetings.forEach(meeting => {
@@ -213,6 +291,7 @@ function normalizeState(raw) {
     students,
     foodEvents,
     donations,
+    calendarAdjustments,
     selectedMeetingId: raw.selectedMeetingId || meetings.at(-1)?.id || "",
     selectedStudentId: raw.selectedStudentId || students[0]?.id || "",
     todayMode: Boolean(raw.todayMode),
@@ -271,6 +350,30 @@ function createSeedFoodEvents() {
   }));
 }
 
+function createSeedCalendarAdjustments() {
+  return calendarAdjustmentSeeds.map(seed => ({
+    ...seed,
+    status: "Not decided",
+    actualDate: "",
+    notes: ""
+  }));
+}
+
+function normalizeCalendarAdjustments(savedAdjustments) {
+  const savedById = new Map(Array.isArray(savedAdjustments)
+    ? savedAdjustments.map(adjustment => [adjustment.id, adjustment])
+    : []);
+  return calendarAdjustmentSeeds.map(seed => {
+    const saved = savedById.get(seed.id) || {};
+    return {
+      ...seed,
+      status: ["Not decided", "Rescheduled", "Skipped"].includes(saved.status) ? saved.status : "Not decided",
+      actualDate: saved.actualDate || "",
+      notes: saved.notes || ""
+    };
+  });
+}
+
 function saveState() {
   state.lastSavedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -292,6 +395,8 @@ function wireEvents() {
   document.getElementById("quickAddStudentForm").addEventListener("submit", addQuickStudent);
   document.getElementById("addStudentForm").addEventListener("submit", addStudent);
   document.getElementById("addMeetingForm").addEventListener("submit", addMeetingFromForm);
+  document.getElementById("autoFillCalendarBtn").addEventListener("click", autoFillCalendarDecisions);
+  document.getElementById("clearCalendarBtn").addEventListener("click", clearCalendarDecisions);
   document.getElementById("addFoodDateForm").addEventListener("submit", addFoodDateFromForm);
   document.getElementById("donationForm").addEventListener("submit", addDonation);
   document.getElementById("backupBtn").addEventListener("click", downloadBackup);
@@ -320,6 +425,7 @@ function render() {
   renderLeaderboard();
   renderStudents();
   renderMeetings();
+  renderCalendarAdjustments();
   renderFoodSignups();
   renderReports();
   showSaved(false);
@@ -491,6 +597,62 @@ function renderMeetings() {
   els.meetingTable.querySelectorAll("[data-remove-meeting]").forEach(button => {
     button.addEventListener("click", () => removeMeeting(button.dataset.removeMeeting));
   });
+}
+
+function renderCalendarAdjustments() {
+  const adjustments = state.calendarAdjustments || createSeedCalendarAdjustments();
+  const rescheduleCount = adjustments.filter(item => calendarRecommendedAction(item) === "Reschedule").length;
+  const skipCount = adjustments.filter(item => calendarRecommendedAction(item) === "Skip").length;
+  els.calendarConflictCount.textContent = adjustments.length;
+  els.calendarRescheduleCount.textContent = rescheduleCount;
+  els.calendarSkipCount.textContent = skipCount;
+  els.calendarAdjustmentsMeta.textContent = `${rescheduleCount} reschedule - ${skipCount} skip`;
+  els.calendarAdjustmentsList.innerHTML = adjustments.map(calendarAdjustmentCard).join("");
+  els.calendarAdjustmentsList.querySelectorAll("[data-calendar-status]").forEach(select => {
+    select.addEventListener("change", () => updateCalendarAdjustment(select.dataset.calendarStatus, "status", select.value));
+  });
+  els.calendarAdjustmentsList.querySelectorAll("[data-calendar-date]").forEach(input => {
+    input.addEventListener("change", () => updateCalendarAdjustment(input.dataset.calendarDate, "actualDate", input.value));
+  });
+  els.calendarAdjustmentsList.querySelectorAll("[data-calendar-notes]").forEach(input => {
+    input.addEventListener("input", () => updateCalendarAdjustment(input.dataset.calendarNotes, "notes", input.value, { skipRender: true }));
+  });
+}
+
+function calendarAdjustmentCard(adjustment) {
+  const action = calendarRecommendedAction(adjustment);
+  const statusOptions = ["Not decided", "Rescheduled", "Skipped"]
+    .map(option => `<option value="${option}"${adjustment.status === option ? " selected" : ""}>${option}</option>`)
+    .join("");
+  return `<article class="calendar-adjustment-card ${action === "Skip" ? "skip-week" : "reschedule-week"}">
+    <div class="calendar-card-header">
+      <div>
+        <span>Week of</span>
+        <h3>${escapeHtml(adjustment.weekOf)}</h3>
+      </div>
+      <strong>${action}</strong>
+    </div>
+    <dl class="calendar-details">
+      <div><dt>Friday unavailable</dt><dd>${formatDate(adjustment.fridayUnavailable)}</dd></div>
+      <div><dt>Reason</dt><dd>${escapeHtml(adjustment.reason)}</dd></div>
+      <div><dt>School days</dt><dd>${adjustment.schoolDays}</dd></div>
+      <div><dt>Suggested FCA day</dt><dd>${adjustment.suggestedDate ? formatDate(adjustment.suggestedDate) : "Skip FCA"}</dd></div>
+    </dl>
+    <div class="calendar-edit-grid">
+      <div class="field">
+        <label for="${adjustment.id}-status">Status</label>
+        <select id="${adjustment.id}-status" data-calendar-status="${adjustment.id}">${statusOptions}</select>
+      </div>
+      <div class="field">
+        <label for="${adjustment.id}-actual-date">Actual FCA date</label>
+        <input id="${adjustment.id}-actual-date" type="date" value="${escapeHtml(adjustment.actualDate)}" data-calendar-date="${adjustment.id}">
+      </div>
+      <div class="field grow">
+        <label for="${adjustment.id}-notes">Notes</label>
+        <input id="${adjustment.id}-notes" type="text" value="${escapeHtml(adjustment.notes)}" placeholder="Optional planning note" data-calendar-notes="${adjustment.id}">
+      </div>
+    </div>
+  </article>`;
 }
 
 function renderFoodSignups() {
@@ -720,6 +882,38 @@ function editStudentName(studentId) {
   student.name = trimmedName;
   saveState();
   render();
+}
+
+function updateCalendarAdjustment(adjustmentId, field, value, options = {}) {
+  const adjustment = state.calendarAdjustments.find(item => item.id === adjustmentId);
+  if (!adjustment) return;
+  adjustment[field] = value;
+  saveState();
+  if (!options.skipRender) renderCalendarAdjustments();
+}
+
+function autoFillCalendarDecisions() {
+  state.calendarAdjustments.forEach(adjustment => {
+    const action = calendarRecommendedAction(adjustment);
+    adjustment.status = action === "Reschedule" ? "Rescheduled" : "Skipped";
+    adjustment.actualDate = action === "Reschedule" ? adjustment.suggestedDate : "";
+  });
+  saveState();
+  render();
+}
+
+function clearCalendarDecisions() {
+  state.calendarAdjustments.forEach(adjustment => {
+    adjustment.status = "Not decided";
+    adjustment.actualDate = "";
+    adjustment.notes = "";
+  });
+  saveState();
+  render();
+}
+
+function calendarRecommendedAction(adjustment) {
+  return adjustment.schoolDays >= 4 ? "Reschedule" : "Skip";
 }
 
 function addMeetingFromForm(event) {

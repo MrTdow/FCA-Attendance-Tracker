@@ -513,6 +513,132 @@ th {
   flex-wrap: wrap;
 }
 
+.calendar-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(170px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.calendar-summary-grid article {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--warrior-blue-light);
+}
+
+.calendar-summary-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.calendar-summary-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--warrior-blue);
+  font-size: 1.8rem;
+}
+
+.calendar-actions {
+  justify-content: flex-end;
+  margin: 8px 0 16px;
+}
+
+.calendar-adjustments-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.calendar-adjustment-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.calendar-adjustment-card.skip-week {
+  border-left: 6px solid var(--red);
+  background: var(--warning-bg);
+}
+
+.calendar-adjustment-card.reschedule-week {
+  border-left: 6px solid var(--success);
+  background: var(--success-bg);
+}
+
+.calendar-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.calendar-card-header span,
+.calendar-details dt {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.calendar-card-header h3 {
+  margin: 3px 0 0;
+  color: var(--warrior-blue);
+}
+
+.calendar-card-header strong {
+  min-width: 96px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: white;
+  color: var(--warrior-blue);
+  text-align: center;
+}
+
+.skip-week .calendar-card-header strong {
+  color: var(--red);
+}
+
+.reschedule-week .calendar-card-header strong {
+  color: var(--success);
+}
+
+.calendar-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.calendar-details div {
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.calendar-details dt,
+.calendar-details dd {
+  margin: 0;
+}
+
+.calendar-details dd {
+  margin-top: 3px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.calendar-edit-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(160px, 1fr);
+  gap: 10px;
+}
+
+.calendar-edit-grid .grow {
+  grid-column: 1 / -1;
+}
+
 .report-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(240px, 1fr));
@@ -837,10 +963,18 @@ body.today-mode .attendance-list {
   }
 
   .summary-grid,
+  .calendar-summary-grid,
   .report-grid,
   .podium-list,
-  .insight-grid {
+  .insight-grid,
+  .calendar-adjustments-list,
+  .calendar-details,
+  .calendar-edit-grid {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-edit-grid .grow {
+    grid-column: auto;
   }
 
   .leaderboard-hero {

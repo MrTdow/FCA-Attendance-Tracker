@@ -24,22 +24,10 @@
 
   <main>
     <section class="summary-grid" aria-label="FCA summary">
-      <article>
-        <span>Students</span>
-        <strong id="studentCount">0</strong>
-      </article>
-      <article>
-        <span>Meetings</span>
-        <strong id="meetingCount">0</strong>
-      </article>
-      <article>
-        <span>Latest Attendance</span>
-        <strong id="latestCount">0</strong>
-      </article>
-      <article>
-        <span>Average</span>
-        <strong id="averageCount">0</strong>
-      </article>
+      <article><span>Students</span><strong id="studentCount">0</strong></article>
+      <article><span>Meetings</span><strong id="meetingCount">0</strong></article>
+      <article><span>Latest Attendance</span><strong id="latestCount">0</strong></article>
+      <article><span>Average</span><strong id="averageCount">0</strong></article>
     </section>
 
     <nav class="view-tabs" aria-label="Tracker views">
@@ -48,6 +36,7 @@
       <button class="tab" data-view="leaderboard" type="button">Leaderboard</button>
       <button class="tab" data-view="students" type="button">Students</button>
       <button class="tab" data-view="meetings" type="button">Meetings</button>
+      <button class="tab" data-view="calendar" type="button">Calendar Adjustments</button>
       <button class="tab" data-view="food" type="button">Food Sign-Up</button>
       <button class="tab" data-view="reports" type="button">Reports</button>
     </nav>
@@ -58,10 +47,7 @@
           <label for="meetingSelect">Meeting date</label>
           <select id="meetingSelect"></select>
         </div>
-        <div class="present-counter">
-          <span>Present</span>
-          <strong id="toolbarPresentCount">0</strong>
-        </div>
+        <div class="present-counter"><span>Present</span><strong id="toolbarPresentCount">0</strong></div>
         <button id="todayModeBtn" class="ghost-btn" type="button">Today Mode</button>
         <button id="addTodayBtn" class="primary-btn" type="button">Add today</button>
         <button id="markAllBtn" class="ghost-btn" type="button">Mark all present</button>
@@ -141,6 +127,26 @@
         <button class="primary-btn" type="submit">Add meeting</button>
       </form>
       <div id="meetingTable" class="data-table"></div>
+    </section>
+
+    <section id="calendarView" class="view">
+      <div class="leaderboard-hero">
+        <div>
+          <p class="eyebrow dark">Friday conflicts</p>
+          <h2>Calendar Adjustments</h2>
+        </div>
+        <span id="calendarAdjustmentsMeta"></span>
+      </div>
+      <section class="calendar-summary-grid" aria-label="Calendar adjustment summary">
+        <article><span>Total Friday conflicts</span><strong id="calendarConflictCount">8</strong></article>
+        <article><span>Weeks to reschedule</span><strong id="calendarRescheduleCount">4</strong></article>
+        <article><span>Weeks to skip</span><strong id="calendarSkipCount">4</strong></article>
+      </section>
+      <div class="toolbar calendar-actions">
+        <button id="autoFillCalendarBtn" class="primary-btn" type="button">Auto-fill decisions</button>
+        <button id="clearCalendarBtn" class="ghost-btn" type="button">Clear all decisions</button>
+      </div>
+      <div id="calendarAdjustmentsList" class="calendar-adjustments-list"></div>
     </section>
 
     <section id="foodView" class="view">
@@ -238,7 +244,7 @@
     </button>
   </template>
 
-  <script src="app.js"></script>
   <div id="saveToast" class="save-toast" aria-live="polite"></div>
+  <script src="app.js"></script>
 </body>
 </html>
