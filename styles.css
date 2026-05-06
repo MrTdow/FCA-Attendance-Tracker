@@ -96,12 +96,42 @@ main {
 .inline-form,
 .quick-add-form,
 .donation-form,
+.school-year-controls,
+.school-year-form,
 .search-row,
 .view-tabs {
   display: flex;
   gap: 10px;
   align-items: end;
   flex-wrap: wrap;
+}
+
+.school-year-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--warrior-blue);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.school-year-panel h2 {
+  margin: 0;
+  color: var(--warrior-blue);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+}
+
+.school-year-controls {
+  justify-content: flex-end;
+}
+
+.school-year-form {
+  align-items: end;
 }
 
 .summary-grid {
@@ -990,6 +1020,11 @@ body.today-mode .attendance-list {
     flex-direction: column;
   }
 
+  .school-year-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .summary-grid,
   .calendar-summary-grid,
   .report-grid,
@@ -1013,6 +1048,8 @@ body.today-mode .attendance-list {
   .header-actions > *,
   .toolbar > *,
   .inline-form > *,
+  .school-year-controls > *,
+  .school-year-form > *,
   .quick-add-form > *,
   .donation-form > * {
     flex: 1 1 100%;

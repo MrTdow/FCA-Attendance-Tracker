@@ -1,4 +1,6 @@
 const STORAGE_KEY = "fca-attendance-tracker-v1";
+const SCHOOL_YEARS_KEY = "fca-attendance-tracker-school-years-v1";
+const DEFAULT_SCHOOL_YEAR = "2025-2026";
 const ATTENDANCE_SEED_VERSION = "fca-attendance-count-sheet-2026-05-01-exact-cells";
 
 const spreadsheetSeedDates = [
@@ -208,13 +210,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function bindElements() {
   [
+    "schoolYearTitle", "schoolYearSelect", "newSchoolYearInput",
     "studentCount", "meetingCount", "latestCount", "averageCount", "meetingSelect",
     "attendanceList", "studentSearch", "currentMeetingMeta", "toolbarPresentCount",
     "keyboardHint", "studentTable", "meetingTable", "quickStudentNameInput",
     "quickStudentPresentInput", "studentNameInput", "meetingDateInput", "meetingNoteInput",
     "dashboardMeta", "insightGrid", "leaderboardMeta", "podiumList", "leaderboardTable",
     "topStudents", "lowStudents", "watchlistMeta", "missingWatchlist", "reportStatsMeta",
-    "reportStatsTable", "calendarAdjustmentsMeta", "calendarConflictCount", "calendarRescheduleCount",
+    "reportStatsTable", "yearComparisonMeta", "yearComparisonTable", "calendarAdjustmentsMeta", "calendarConflictCount", "calendarRescheduleCount",
     "calendarSkipCount", "calendarAdjustmentsList", "foodSignupMeta", "foodDateInput", "foodDateNoteInput",
     "donationEventSelect", "donorNameInput", "foodItemInput", "servingsInput",
     "donorContactInput", "donationNotesInput", "foodSignupList", "saveToast"
@@ -226,24 +229,70 @@ function bindElements() {
 }
 
 function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
+  const yearStore = loadSchoolYearStore();
+  const activeYear = yearStore.years?.[yearStore.activeYear]
+    ? yearStore.activeYear
+    : Object.keys(yearStore.years || {})[0] || DEFAULT_SCHOOL_YEAR;
+  const saved = yearStore.years?.[activeYear];
   if (saved) {
     try {
-      const parsed = JSON.parse(saved);
-      const normalized = normalizeState(parsed);
-      if (normalized.attendanceSeedVersion !== parsed.attendanceSeedVersion) {
-        normalized.lastSavedAt = new Date().toISOString();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-      }
+      const normalized = normalizeState({ ...saved, schoolYear: activeYear });
       return normalized;
+    } catch {
+      delete yearStore.years[activeYear];
+      saveSchoolYearStore(yearStore);
+    }
+  }
+  const starter = createSeedState(DEFAULT_SCHOOL_YEAR);
+  saveStateToYearStore(starter);
+  return starter;
+}
+
+function loadSchoolYearStore() {
+  const savedStore = localStorage.getItem(SCHOOL_YEARS_KEY);
+  if (savedStore) {
+    try {
+      const parsed = JSON.parse(savedStore);
+      if (parsed && typeof parsed === "object" && parsed.years && typeof parsed.years === "object") {
+        return {
+          activeYear: parsed.activeYear || DEFAULT_SCHOOL_YEAR,
+          years: parsed.years
+        };
+      }
+    } catch {
+      localStorage.removeItem(SCHOOL_YEARS_KEY);
+    }
+  }
+  const legacy = localStorage.getItem(STORAGE_KEY);
+  if (legacy) {
+    try {
+      const legacyState = normalizeState({ ...JSON.parse(legacy), schoolYear: DEFAULT_SCHOOL_YEAR });
+      return {
+        activeYear: legacyState.schoolYear,
+        years: { [legacyState.schoolYear]: legacyState }
+      };
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
   }
-  return createSeedState();
+  return { activeYear: DEFAULT_SCHOOL_YEAR, years: {} };
 }
 
-function createSeedState() {
+function saveSchoolYearStore(store) {
+  localStorage.setItem(SCHOOL_YEARS_KEY, JSON.stringify(store));
+}
+
+function saveStateToYearStore(nextState = state) {
+  const schoolYear = nextState.schoolYear || DEFAULT_SCHOOL_YEAR;
+  const store = loadSchoolYearStore();
+  store.activeYear = schoolYear;
+  store.years = store.years || {};
+  store.years[schoolYear] = nextState;
+  saveSchoolYearStore(store);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+}
+
+function createSeedState(schoolYear = DEFAULT_SCHOOL_YEAR) {
   const meetings = seedDates.map(date => ({
     id: `meeting-${date}`,
     date,
@@ -257,6 +306,7 @@ function createSeedState() {
     return { id: makeId("student"), name, attendance };
   });
   return {
+    schoolYear,
     meetings,
     students,
     foodEvents: createSeedFoodEvents(),
@@ -264,6 +314,23 @@ function createSeedState() {
     calendarAdjustments: createSeedCalendarAdjustments(),
     selectedMeetingId: meetings.at(-1)?.id || "",
     selectedStudentId: students[0]?.id || "",
+    leaderboardSort: "total",
+    todayMode: false,
+    lastSavedAt: "",
+    attendanceSeedVersion: ATTENDANCE_SEED_VERSION
+  };
+}
+
+function createEmptySchoolYearState(schoolYear) {
+  return {
+    schoolYear,
+    meetings: [],
+    students: [],
+    foodEvents: createSeedFoodEvents(),
+    donations: [],
+    calendarAdjustments: createSeedCalendarAdjustments(),
+    selectedMeetingId: "",
+    selectedStudentId: "",
     leaderboardSort: "total",
     todayMode: false,
     lastSavedAt: "",
@@ -293,6 +360,7 @@ function normalizeState(raw) {
     foodEvents,
     donations,
     calendarAdjustments,
+    schoolYear: raw.schoolYear || DEFAULT_SCHOOL_YEAR,
     selectedMeetingId: raw.selectedMeetingId || meetings.at(-1)?.id || "",
     selectedStudentId: raw.selectedStudentId || students[0]?.id || "",
     leaderboardSort: ["total", "percent", "currentStreak"].includes(raw.leaderboardSort) ? raw.leaderboardSort : "total",
@@ -377,12 +445,15 @@ function normalizeCalendarAdjustments(savedAdjustments) {
 }
 
 function saveState() {
+  state.schoolYear = state.schoolYear || DEFAULT_SCHOOL_YEAR;
   state.lastSavedAt = new Date().toISOString();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  saveStateToYearStore(state);
   showSaved();
 }
 
 function wireEvents() {
+  els.schoolYearSelect.addEventListener("change", event => switchSchoolYear(event.target.value));
+  document.getElementById("addSchoolYearForm").addEventListener("submit", addSchoolYear);
   els.tabs.forEach(tab => tab.addEventListener("click", () => switchView(tab.dataset.view)));
   els.meetingSelect.addEventListener("change", event => {
     state.selectedMeetingId = event.target.value;
@@ -420,6 +491,7 @@ function render() {
   ensureSelectedMeeting();
   ensureSelectedStudent();
   document.body.classList.toggle("today-mode", state.todayMode);
+  renderSchoolYearPicker();
   renderSummary();
   renderMeetingSelect();
   renderAttendanceList();
@@ -443,6 +515,18 @@ function ensureSelectedStudent() {
   if (!state.students.some(student => student.id === state.selectedStudentId)) {
     state.selectedStudentId = getVisibleStudents()[0]?.id || state.students[0]?.id || "";
   }
+}
+
+function renderSchoolYearPicker() {
+  const store = loadSchoolYearStore();
+  const years = Object.keys(store.years || {});
+  if (!years.includes(state.schoolYear)) years.push(state.schoolYear);
+  years.sort();
+  els.schoolYearTitle.textContent = state.schoolYear || DEFAULT_SCHOOL_YEAR;
+  els.schoolYearSelect.innerHTML = years
+    .map(year => `<option value="${escapeHtml(year)}">${escapeHtml(year)}</option>`)
+    .join("");
+  els.schoolYearSelect.value = state.schoolYear || DEFAULT_SCHOOL_YEAR;
 }
 
 function renderSummary() {
@@ -736,6 +820,31 @@ function renderReports() {
       <td>${badgesForStudent(item).map(badge => `<span class="badge">${badge}</span>`).join(" ")}</td>
     </tr>`).join("")}</tbody>
   </table>`;
+  renderYearComparison();
+}
+
+function renderYearComparison() {
+  state.schoolYear = state.schoolYear || DEFAULT_SCHOOL_YEAR;
+  saveStateToYearStore(state);
+  const rows = yearComparisonRows();
+  els.yearComparisonMeta.textContent = `${rows.length} school year${rows.length === 1 ? "" : "s"} saved`;
+  if (!rows.length) {
+    els.yearComparisonTable.innerHTML = `<p class="empty-state">Add another school year to compare attendance.</p>`;
+    return;
+  }
+  els.yearComparisonTable.innerHTML = `<table>
+    <thead><tr>
+      <th>School year</th><th>Students</th><th>Meetings</th><th>Total attendance</th>
+      <th>Avg per meeting</th><th>Attendance rate</th><th>Highest meeting</th><th>Lowest meeting</th>
+    </tr></thead>
+    <tbody>${rows.map(row => `<tr>
+      <td><strong>${escapeHtml(row.schoolYear)}</strong>${row.schoolYear === state.schoolYear ? ` <span class="badge">Current</span>` : ""}</td>
+      <td>${row.students}</td><td>${row.meetings}</td><td>${row.totalAttendance}</td>
+      <td>${row.averagePerMeeting}</td><td>${row.attendanceRate}%</td>
+      <td>${row.highest ? `${formatDate(row.highest.date)} (${row.highest.count})` : "None"}</td>
+      <td>${row.lowest ? `${formatDate(row.lowest.date)} (${row.lowest.count})` : "None"}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
 }
 
 function renderMissingWatchlist() {
@@ -752,6 +861,44 @@ function missReason(item) {
   if (item.missedStreak >= 2) return `Missed ${item.missedStreak} in a row`;
   if (item.missedLatest) return "Missed the latest meeting";
   return `Missed ${item.missedRecent} of the last 3`;
+}
+
+function yearComparisonRows() {
+  const store = loadSchoolYearStore();
+  return Object.entries(store.years || {})
+    .map(([schoolYear, yearState]) => yearSummary(schoolYear, yearState))
+    .sort((a, b) => a.schoolYear.localeCompare(b.schoolYear));
+}
+
+function yearSummary(schoolYear, yearState) {
+  const normalized = normalizeState({ ...yearState, schoolYear });
+  const meetings = normalized.meetings || [];
+  const students = normalized.students || [];
+  const meetingCounts = meetings.map(meeting => ({
+    date: meeting.date,
+    count: students.filter(student => student.attendance?.[meeting.id]).length
+  }));
+  const totalAttendance = meetingCounts.reduce((sum, meeting) => sum + meeting.count, 0);
+  const possibleAttendance = meetings.length * students.length;
+  return {
+    schoolYear,
+    students: students.length,
+    meetings: meetings.length,
+    totalAttendance,
+    averagePerMeeting: meetings.length ? Math.round(totalAttendance / meetings.length) : 0,
+    attendanceRate: possibleAttendance ? Math.round((totalAttendance / possibleAttendance) * 100) : 0,
+    highest: yearMeetingExtreme(meetingCounts, "high"),
+    lowest: yearMeetingExtreme(meetingCounts, "low")
+  };
+}
+
+function yearMeetingExtreme(meetingCounts, type) {
+  if (!meetingCounts.length) return null;
+  return meetingCounts.slice().sort((a, b) =>
+    type === "high"
+      ? b.count - a.count || a.date.localeCompare(b.date)
+      : a.count - b.count || a.date.localeCompare(b.date)
+  )[0];
 }
 
 function studentStats(student) {
@@ -849,6 +996,50 @@ function toggleAttendance(studentId, meetingId) {
   student.attendance[meetingId] = !student.attendance[meetingId];
   saveState();
   render();
+}
+
+function switchSchoolYear(schoolYear) {
+  const store = loadSchoolYearStore();
+  if (!store.years?.[schoolYear]) return;
+  state.schoolYear = state.schoolYear || DEFAULT_SCHOOL_YEAR;
+  saveStateToYearStore(state);
+  store.activeYear = schoolYear;
+  saveSchoolYearStore(store);
+  state = normalizeState({ ...store.years[schoolYear], schoolYear });
+  render();
+  showSaved(true, `Opened ${schoolYear}`);
+}
+
+function addSchoolYear(event) {
+  event.preventDefault();
+  const schoolYear = els.newSchoolYearInput.value.trim();
+  if (!isValidSchoolYear(schoolYear)) {
+    alert("Use a school year like 2026-2027.");
+    return;
+  }
+  const store = loadSchoolYearStore();
+  if (store.years?.[schoolYear]) {
+    switchSchoolYear(schoolYear);
+    els.newSchoolYearInput.value = "";
+    return;
+  }
+  state.schoolYear = state.schoolYear || DEFAULT_SCHOOL_YEAR;
+  saveStateToYearStore(state);
+  const nextState = createEmptySchoolYearState(schoolYear);
+  store.years = store.years || {};
+  store.years[state.schoolYear] = state;
+  store.years[schoolYear] = nextState;
+  store.activeYear = schoolYear;
+  saveSchoolYearStore(store);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+  state = nextState;
+  els.newSchoolYearInput.value = "";
+  render();
+  showSaved(true, `Created ${schoolYear}`);
+}
+
+function isValidSchoolYear(value) {
+  return /^\d{4}-\d{4}$/.test(value);
 }
 
 function setAllForCurrentMeeting(value) {
@@ -1192,7 +1383,15 @@ async function copyParentMessage(eventId) {
 }
 
 function downloadBackup() {
-  downloadText("fca-attendance-backup.json", JSON.stringify(state, null, 2), "application/json");
+  state.schoolYear = state.schoolYear || DEFAULT_SCHOOL_YEAR;
+  saveStateToYearStore(state);
+  const store = loadSchoolYearStore();
+  downloadText("fca-attendance-school-years-backup.json", JSON.stringify({
+    app: "FCA Attendance Tracker",
+    backupType: "school-years",
+    activeYear: state.schoolYear,
+    years: store.years || {}
+  }, null, 2), "application/json");
 }
 
 function restoreBackup(event) {
@@ -1201,7 +1400,18 @@ function restoreBackup(event) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      state = normalizeState(JSON.parse(reader.result));
+      const parsed = JSON.parse(reader.result);
+      if (parsed.backupType === "school-years" && parsed.years && typeof parsed.years === "object") {
+        const years = {};
+        Object.entries(parsed.years).forEach(([year, yearState]) => {
+          years[year] = normalizeState({ ...yearState, schoolYear: year });
+        });
+        const activeYear = years[parsed.activeYear] ? parsed.activeYear : Object.keys(years)[0] || DEFAULT_SCHOOL_YEAR;
+        saveSchoolYearStore({ activeYear, years });
+        state = years[activeYear] || createSeedState(DEFAULT_SCHOOL_YEAR);
+      } else {
+        state = normalizeState({ ...parsed, schoolYear: parsed.schoolYear || state.schoolYear || DEFAULT_SCHOOL_YEAR });
+      }
       saveState();
       render();
     } catch {
@@ -1213,8 +1423,11 @@ function restoreBackup(event) {
 }
 
 function resetTracker() {
-  if (!confirm("Reset back to starter FCA data?")) return;
-  state = createSeedState();
+  const schoolYear = state.schoolYear || DEFAULT_SCHOOL_YEAR;
+  if (!confirm(`Reset ${schoolYear} back to starter data? Other school years will stay saved.`)) return;
+  state = schoolYear === DEFAULT_SCHOOL_YEAR
+    ? createSeedState(schoolYear)
+    : createEmptySchoolYearState(schoolYear);
   saveState();
   render();
 }

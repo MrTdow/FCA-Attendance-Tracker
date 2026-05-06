@@ -23,6 +23,26 @@
   </header>
 
   <main>
+    <section class="school-year-panel" aria-label="School year memory">
+      <div>
+        <p class="eyebrow dark">School Year Memory</p>
+        <h2 id="schoolYearTitle">2025-2026</h2>
+      </div>
+      <div class="school-year-controls">
+        <div class="field">
+          <label for="schoolYearSelect">Current school year</label>
+          <select id="schoolYearSelect"></select>
+        </div>
+        <form id="addSchoolYearForm" class="school-year-form">
+          <div class="field">
+            <label for="newSchoolYearInput">New school year</label>
+            <input id="newSchoolYearInput" type="text" placeholder="2026-2027">
+          </div>
+          <button class="primary-btn" type="submit">Add year</button>
+        </form>
+      </div>
+    </section>
+
     <section class="summary-grid" aria-label="FCA summary">
       <article><span>Students</span><strong id="studentCount">0</strong></article>
       <article><span>Meetings</span><strong id="meetingCount">0</strong></article>
@@ -233,6 +253,13 @@
           <span id="reportStatsMeta"></span>
         </div>
         <div id="reportStatsTable" class="data-table"></div>
+      </article>
+      <article class="watchlist-panel">
+        <div class="watchlist-header">
+          <h2>Year-to-Year Comparison</h2>
+          <span id="yearComparisonMeta"></span>
+        </div>
+        <div id="yearComparisonTable" class="data-table"></div>
       </article>
     </section>
   </main>
