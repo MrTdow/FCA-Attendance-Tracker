@@ -497,6 +497,34 @@ th {
   font-size: 0.86rem;
 }
 
+.sort-header {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--warrior-blue);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.sort-header::after {
+  content: " sort";
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.sort-header.active {
+  background: var(--warrior-blue);
+  border-color: var(--warrior-blue);
+  color: white;
+}
+
+.sort-header.active::after {
+  content: " ranked";
+  color: white;
+}
+
 .small-btn {
   min-height: 34px;
   padding: 6px 10px;

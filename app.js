@@ -264,6 +264,7 @@ function createSeedState() {
     calendarAdjustments: createSeedCalendarAdjustments(),
     selectedMeetingId: meetings.at(-1)?.id || "",
     selectedStudentId: students[0]?.id || "",
+    leaderboardSort: "total",
     todayMode: false,
     lastSavedAt: "",
     attendanceSeedVersion: ATTENDANCE_SEED_VERSION
@@ -294,6 +295,7 @@ function normalizeState(raw) {
     calendarAdjustments,
     selectedMeetingId: raw.selectedMeetingId || meetings.at(-1)?.id || "",
     selectedStudentId: raw.selectedStudentId || students[0]?.id || "",
+    leaderboardSort: ["total", "percent", "currentStreak"].includes(raw.leaderboardSort) ? raw.leaderboardSort : "total",
     todayMode: Boolean(raw.todayMode),
     lastSavedAt: raw.lastSavedAt || "",
     attendanceSeedVersion: raw.attendanceSeedVersion || ""
@@ -536,24 +538,35 @@ function metricCard(title, value) {
 function renderLeaderboard() {
   const ranked = leaderboardRows();
   const topThree = ranked.slice(0, 3);
+  const sortLabel = leaderboardSortLabel();
   els.leaderboardMeta.textContent = ranked[0]
-    ? `Leading streak: ${ranked[0].currentStreak} - ${ranked[0].percent}% attendance`
+    ? `Ranking by ${sortLabel}: ${leaderboardSortValue(ranked[0])}`
     : "Add students to start the leaderboard";
   els.podiumList.innerHTML = topThree.map((item, index) => `<article class="podium-card rank-${index + 1}">
     <span class="rank-badge">#${index + 1}</span>
     <strong>${escapeHtml(item.name)}</strong>
-    <span>${item.currentStreak} current streak</span>
-    <small>${item.percent}% attendance - ${item.total} total</small>
+    <span>${item.total} total attended</span>
+    <small>${item.percent}% attendance - ${item.currentStreak} current streak</small>
     <div class="tile-badges">${badgesForStudent(item).map(badge => `<span class="badge">${badge}</span>`).join("")}</div>
   </article>`).join("");
   els.leaderboardTable.innerHTML = `<table>
-    <thead><tr><th>Rank</th><th>Student</th><th>Current streak</th><th>Attendance %</th><th>Total</th><th>Badges</th></tr></thead>
+    <thead><tr>
+      <th>Rank</th>
+      <th>Student</th>
+      <th><button class="sort-header ${state.leaderboardSort === "total" ? "active" : ""}" type="button" data-leaderboard-sort="total">Total</button></th>
+      <th><button class="sort-header ${state.leaderboardSort === "percent" ? "active" : ""}" type="button" data-leaderboard-sort="percent">Attendance %</button></th>
+      <th><button class="sort-header ${state.leaderboardSort === "currentStreak" ? "active" : ""}" type="button" data-leaderboard-sort="currentStreak">Current streak</button></th>
+      <th>Badges</th>
+    </tr></thead>
     <tbody>${ranked.map((item, index) => `<tr>
-      <td>${index + 1}</td><td>${escapeHtml(item.name)}</td><td><strong>${item.currentStreak}</strong></td>
-      <td>${item.percent}%</td><td>${item.total}</td>
+      <td>${index + 1}</td><td>${escapeHtml(item.name)}</td><td><strong>${item.total}</strong></td>
+      <td>${item.percent}%</td><td>${item.currentStreak}</td>
       <td>${badgesForStudent(item).map(badge => `<span class="badge">${badge}</span>`).join(" ")}</td>
     </tr>`).join("")}</tbody>
   </table>`;
+  els.leaderboardTable.querySelectorAll("[data-leaderboard-sort]").forEach(button => {
+    button.addEventListener("click", () => setLeaderboardSort(button.dataset.leaderboardSort));
+  });
 }
 
 function renderStudents() {
@@ -793,7 +806,37 @@ function isComebackStudent(student) {
 
 function leaderboardRows() {
   return state.students.map(studentStats)
-    .sort((a, b) => b.currentStreak - a.currentStreak || b.percent - a.percent || b.total - a.total || a.name.localeCompare(b.name));
+    .sort((a, b) => leaderboardCompare(a, b));
+}
+
+function leaderboardCompare(a, b) {
+  const sort = state.leaderboardSort || "total";
+  if (sort === "currentStreak") {
+    return b.currentStreak - a.currentStreak || b.total - a.total || b.percent - a.percent || a.name.localeCompare(b.name);
+  }
+  if (sort === "percent") {
+    return b.percent - a.percent || b.total - a.total || b.currentStreak - a.currentStreak || a.name.localeCompare(b.name);
+  }
+  return b.total - a.total || b.percent - a.percent || b.currentStreak - a.currentStreak || a.name.localeCompare(b.name);
+}
+
+function setLeaderboardSort(sort) {
+  if (!["total", "percent", "currentStreak"].includes(sort)) return;
+  state.leaderboardSort = sort;
+  saveState();
+  renderLeaderboard();
+}
+
+function leaderboardSortLabel() {
+  if (state.leaderboardSort === "currentStreak") return "current streak";
+  if (state.leaderboardSort === "percent") return "attendance percentage";
+  return "total attendance";
+}
+
+function leaderboardSortValue(item) {
+  if (state.leaderboardSort === "currentStreak") return `${item.currentStreak} meeting streak`;
+  if (state.leaderboardSort === "percent") return `${item.percent}% attendance`;
+  return `${item.total} meetings attended`;
 }
 
 function currentMeeting() {
