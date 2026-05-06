@@ -1,6 +1,8 @@
 const STORAGE_KEY = "fca-attendance-tracker-v1";
 const SCHOOL_YEARS_KEY = "fca-attendance-tracker-school-years-v1";
 const DEFAULT_SCHOOL_YEAR = "2025-2026";
+const PLANNING_SCHOOL_YEAR = "2026-2027";
+const PLANNING_YEAR_MIGRATION = "move-planning-data-to-2026-2027";
 const ATTENDANCE_SEED_VERSION = "fca-attendance-count-sheet-2026-05-01-exact-cells";
 
 const spreadsheetSeedDates = [
@@ -254,10 +256,12 @@ function loadSchoolYearStore() {
     try {
       const parsed = JSON.parse(savedStore);
       if (parsed && typeof parsed === "object" && parsed.years && typeof parsed.years === "object") {
-        return {
+        const store = {
           activeYear: parsed.activeYear || DEFAULT_SCHOOL_YEAR,
-          years: parsed.years
+          years: parsed.years,
+          migrations: Array.isArray(parsed.migrations) ? parsed.migrations : []
         };
+        return migratePlanningDataTo2026(store);
       }
     } catch {
       localStorage.removeItem(SCHOOL_YEARS_KEY);
@@ -267,19 +271,70 @@ function loadSchoolYearStore() {
   if (legacy) {
     try {
       const legacyState = normalizeState({ ...JSON.parse(legacy), schoolYear: DEFAULT_SCHOOL_YEAR });
-      return {
+      return migratePlanningDataTo2026({
         activeYear: legacyState.schoolYear,
-        years: { [legacyState.schoolYear]: legacyState }
-      };
+        years: { [legacyState.schoolYear]: legacyState },
+        migrations: []
+      });
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
   }
-  return { activeYear: DEFAULT_SCHOOL_YEAR, years: {} };
+  return { activeYear: DEFAULT_SCHOOL_YEAR, years: {}, migrations: [] };
 }
 
 function saveSchoolYearStore(store) {
   localStorage.setItem(SCHOOL_YEARS_KEY, JSON.stringify(store));
+}
+
+function migratePlanningDataTo2026(store) {
+  store.years = store.years || {};
+  store.migrations = Array.isArray(store.migrations) ? store.migrations : [];
+  if (store.migrations.includes(PLANNING_YEAR_MIGRATION)) return store;
+
+  const source = store.years[DEFAULT_SCHOOL_YEAR];
+  if (!source) return store;
+
+  const sourceFoodEvents = Array.isArray(source.foodEvents) ? source.foodEvents : [];
+  const sourceDonations = Array.isArray(source.donations) ? source.donations : [];
+  const sourceCalendarAdjustments = Array.isArray(source.calendarAdjustments) ? source.calendarAdjustments : [];
+  const hasPlanningData = sourceFoodEvents.length || sourceDonations.length || sourceCalendarAdjustments.length;
+  if (!hasPlanningData) {
+    store.migrations.push(PLANNING_YEAR_MIGRATION);
+    saveSchoolYearStore(store);
+    return store;
+  }
+
+  const target = store.years[PLANNING_SCHOOL_YEAR] || createEmptySchoolYearState(PLANNING_SCHOOL_YEAR);
+  target.schoolYear = PLANNING_SCHOOL_YEAR;
+  target.foodEvents = sourceFoodEvents.length ? sourceFoodEvents : target.foodEvents;
+  target.donations = mergeById(sourceDonations, Array.isArray(target.donations) ? target.donations : []);
+  target.calendarAdjustments = sourceCalendarAdjustments.length ? mergeCalendarAdjustments(sourceCalendarAdjustments, target.calendarAdjustments) : target.calendarAdjustments;
+
+  source.foodEvents = [];
+  source.donations = [];
+  source.calendarAdjustments = [];
+  store.years[DEFAULT_SCHOOL_YEAR] = source;
+  store.years[PLANNING_SCHOOL_YEAR] = target;
+  store.migrations.push(PLANNING_YEAR_MIGRATION);
+  saveSchoolYearStore(store);
+  return store;
+}
+
+function mergeById(primaryItems, secondaryItems) {
+  const merged = new Map();
+  secondaryItems.forEach(item => {
+    if (item?.id) merged.set(item.id, item);
+  });
+  primaryItems.forEach(item => {
+    if (item?.id) merged.set(item.id, item);
+  });
+  return Array.from(merged.values());
+}
+
+function mergeCalendarAdjustments(primaryItems, secondaryItems = []) {
+  const secondaryById = new Map(Array.isArray(secondaryItems) ? secondaryItems.map(item => [item.id, item]) : []);
+  return primaryItems.map(item => ({ ...(secondaryById.get(item.id) || {}), ...item }));
 }
 
 function saveStateToYearStore(nextState = state) {
@@ -309,9 +364,9 @@ function createSeedState(schoolYear = DEFAULT_SCHOOL_YEAR) {
     schoolYear,
     meetings,
     students,
-    foodEvents: createSeedFoodEvents(),
+    foodEvents: schoolYear === PLANNING_SCHOOL_YEAR ? createSeedFoodEvents() : [],
     donations: [],
-    calendarAdjustments: createSeedCalendarAdjustments(),
+    calendarAdjustments: schoolYear === PLANNING_SCHOOL_YEAR ? createSeedCalendarAdjustments() : [],
     selectedMeetingId: meetings.at(-1)?.id || "",
     selectedStudentId: students[0]?.id || "",
     leaderboardSort: "total",
@@ -326,9 +381,9 @@ function createEmptySchoolYearState(schoolYear) {
     schoolYear,
     meetings: [],
     students: [],
-    foodEvents: createSeedFoodEvents(),
+    foodEvents: schoolYear === PLANNING_SCHOOL_YEAR ? createSeedFoodEvents() : [],
     donations: [],
-    calendarAdjustments: createSeedCalendarAdjustments(),
+    calendarAdjustments: schoolYear === PLANNING_SCHOOL_YEAR ? createSeedCalendarAdjustments() : [],
     selectedMeetingId: "",
     selectedStudentId: "",
     leaderboardSort: "total",
@@ -341,13 +396,17 @@ function createEmptySchoolYearState(schoolYear) {
 function normalizeState(raw) {
   const meetings = Array.isArray(raw.meetings) ? raw.meetings : [];
   const students = Array.isArray(raw.students) ? raw.students : [];
-  const rawFoodEvents = Array.isArray(raw.foodEvents) ? raw.foodEvents : createSeedFoodEvents();
+  const rawFoodEvents = Array.isArray(raw.foodEvents)
+    ? raw.foodEvents
+    : raw.schoolYear === PLANNING_SCHOOL_YEAR ? createSeedFoodEvents() : [];
   const removedFoodEventIds = new Set(rawFoodEvents.filter(event => schoolOffFoodDates.has(event.date)).map(event => event.id));
   const foodEvents = rawFoodEvents.filter(event => !schoolOffFoodDates.has(event.date));
   const donations = Array.isArray(raw.donations)
     ? raw.donations.filter(donation => !removedFoodEventIds.has(donation.eventId))
     : [];
-  const calendarAdjustments = normalizeCalendarAdjustments(raw.calendarAdjustments);
+  const calendarAdjustments = Array.isArray(raw.calendarAdjustments)
+    ? raw.calendarAdjustments.length ? normalizeCalendarAdjustments(raw.calendarAdjustments) : []
+    : raw.schoolYear === PLANNING_SCHOOL_YEAR ? createSeedCalendarAdjustments() : [];
   students.forEach(student => {
     if (!student.attendance || typeof student.attendance !== "object") student.attendance = {};
     meetings.forEach(meeting => {
